@@ -1,4 +1,5 @@
-*.csv
+med_features.csv
+med_pipeline.py
 *.xlsx
 *.docx
 __pycache__/
