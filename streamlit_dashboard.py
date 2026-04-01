@@ -658,7 +658,7 @@ with tab1:
     
     # Key insights
     st.subheader("Key Insights")
-    col_insight1, col_insight2 = st.columns(2)
+    col_insight1, col_insight2, col_insight3 = st.columns(3)
 
     with col_insight1:
         utilization_issues = filtered_data[filtered_data['utilization_flag'] == 1]['utilization'].mean()
@@ -670,12 +670,22 @@ with tab1:
         asp_drop = (asp_flagged_mean / asp_normal_mean * 100 - 100) if asp_normal_mean > 0 else 0
         st.markdown(f"<div style='text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #FFEBEE 0%, #FFCDD2 100%); border-radius: 12px; border: 1px solid #EF9A9A; border-left: 5px solid #E53935; min-height: 120px; display: flex; flex-direction: column; justify-content: center;'><p style='font-size: 11px; color: #B71C1C; margin: 0 0 0.5rem 0; font-weight: bold;'>ASP Gap</p><p style='font-size: 28px; font-weight: bold; color: #E53935; margin: 0;'>{asp_drop:.1f}%</p><p style='font-size: 10px; color: #555; margin: 0.5rem 0 0 0;'>Flagged avg: ${asp_flagged_mean:.0f} vs Normal avg: ${asp_normal_mean:.0f}</p></div>", unsafe_allow_html=True)
 
+    with col_insight3:
+        pf_flag_count = int(filtered_data['patient_fallout_flag'].sum()) if 'patient_fallout_flag' in filtered_data.columns else 0
+        pf_total = len(filtered_data)
+        pf_pct = (pf_flag_count / pf_total * 100) if pf_total > 0 else 0
+        st.markdown(f"<div style='text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #FFF3E0 0%, #FFE0B2 100%); border-radius: 12px; border: 1px solid #FFCC80; border-left: 5px solid #E65100; min-height: 120px; display: flex; flex-direction: column; justify-content: center;'><p style='font-size: 11px; color: #BF360C; margin: 0 0 0.5rem 0; font-weight: bold;'>Patient Fallout (Flagged Sites)</p><p style='font-size: 28px; font-weight: bold; color: #E65100; margin: 0;'>{pf_flag_count}</p><p style='font-size: 10px; color: #555; margin: 0.5rem 0 0 0;'>{pf_pct:.1f}% of all sites flagged</p></div>", unsafe_allow_html=True)
+
     st.markdown("""
     <p style='font-size: 12px; color: #667A8C; margin-top: 0.75rem; line-height: 1.5;'>
     <strong>ASP Gap</strong> measures the percentage difference in Average Selling Price between
     flagged sites (Z-score > ±2σ) and non-flagged sites. A negative gap means flagged stores are
     generating less revenue per transaction than their peers — indicating potential pricing, product mix,
     or upsell issues that require attention.
+    &nbsp;&nbsp;|&nbsp;&nbsp;
+    <strong>Patient Fallout</strong> measures the increase in cancellations + no-shows at flagged sites
+    versus non-flagged peers. A positive increase signals scheduling or patient retention issues
+    that may be suppressing revenue and utilization.
     </p>
     """, unsafe_allow_html=True)
 
