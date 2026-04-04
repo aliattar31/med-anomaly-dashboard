@@ -1,7 +1,11 @@
 med_features.csv
-med_pipeline.py
+med_clean.csv
+/med_pipeline.py
+/med_pipeline2.py
 *.xlsx
+!MED Data v2/diagnostic_*.xlsx
 *.docx
+*.pdf
 __pycache__/
 *.pyc
 .DS_Store
@@ -9,3 +13,8 @@ __pycache__/
 venv/
 env/
 .venv/
+.claude/
+
+# Large data files in v2
+MED Data v2/med_clean.csv
+MED Data v2/med_features.csv

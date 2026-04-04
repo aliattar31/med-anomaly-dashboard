@@ -168,26 +168,51 @@ st.markdown("""
         background-color: transparent !important;
     }
     
-    [data-testid="stTabs"] button {
+    [data-testid="stTabs"] button,
+    [data-testid="stTabs"] button p {
         color: #667A8C !important;
         font-size: 14px !important;
         font-weight: 600 !important;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    }
+
+    [data-testid="stTabs"] button {
         padding: 12px 24px !important;
         background-color: transparent !important;
         border-bottom: 2px solid transparent !important;
-        transition: all 0.3s ease !important;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+        border-radius: 6px 6px 0 0 !important;
+        transition: background-color 0.3s ease, color 0.3s ease !important;
     }
-    
+
+    [data-testid="stTabs"] button:hover,
+    [data-testid="stTabs"] button:hover p {
+        color: #FFFFFF !important;
+        background-color: transparent !important;
+    }
+
     [data-testid="stTabs"] button:hover {
-        color: #1A365D !important;
-        border-bottom: 2px solid #E5E9F0 !important;
-    }
-    
-    [data-testid="stTabs"] button[aria-selected="true"] {
-        color: #1E7BC0 !important;
+        background-color: #1E7BC0 !important;
         border-bottom: 2px solid #1E7BC0 !important;
+    }
+
+    [data-testid="stTabs"] button[aria-selected="true"],
+    [data-testid="stTabs"] button[aria-selected="true"] p {
+        color: #1E7BC0 !important;
         font-weight: 700 !important;
+    }
+
+    [data-testid="stTabs"] button[aria-selected="true"] {
+        border-bottom: 2px solid #1E7BC0 !important;
+        background-color: transparent !important;
+    }
+
+    [data-testid="stTabs"] button[aria-selected="true"]:hover,
+    [data-testid="stTabs"] button[aria-selected="true"]:hover p {
+        color: #FFFFFF !important;
+    }
+
+    [data-testid="stTabs"] button[aria-selected="true"]:hover {
+        background-color: #1E7BC0 !important;
     }
     
     /* Disable Material Icons rendering */
@@ -351,10 +376,11 @@ st.markdown("""
 # ─────────────────────────────────────────────
 @st.cache_data
 def load_data():
-    anomaly = pd.read_csv('med_anomaly_scores.csv')
-    critical = pd.read_csv('med_critical_alerts.csv')
-    watch = pd.read_csv('med_watch_list.csv')
-    positive_outliers = pd.read_csv('med_positive_outliers.csv')
+    data_dir = 'MED Data v2'
+    anomaly = pd.read_csv(f'{data_dir}/med_anomaly_scores.csv')
+    critical = pd.read_csv(f'{data_dir}/med_critical_alerts.csv')
+    watch = pd.read_csv(f'{data_dir}/med_watch_list.csv')
+    positive_outliers = pd.read_csv(f'{data_dir}/med_positive_outliers.csv')
 
     # Convert date column
     anomaly['date'] = pd.to_datetime(anomaly['date'])
@@ -369,7 +395,17 @@ def load_data():
 
     return anomaly, critical, watch, positive_outliers
 
+@st.cache_data
+def load_forecast_data():
+    data_dir = 'MED Data v2'
+    projections = pd.read_excel(f'{data_dir}/diagnostic_projections.xlsx')
+    seasonality = pd.read_excel(f'{data_dir}/diagnostic_seasonality.xlsx')
+    structural_breaks = pd.read_excel(f'{data_dir}/diagnostic_structural_breaks.xlsx')
+    structural_breaks['date'] = pd.to_datetime(structural_breaks['date'])
+    return projections, seasonality, structural_breaks
+
 anomaly, critical, watch, positive_outliers = load_data()
+projections, seasonality, structural_breaks = load_forecast_data()
 
 # ─────────────────────────────────────────────
 # SIDEBAR FILTERS
@@ -444,12 +480,14 @@ if tele_opt:
 # ─────────────────────────────────────────────
 # NAVIGATION TABS
 # ─────────────────────────────────────────────
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📊  Executive Summary",
     "🚨  Alerts",
     "⚠️  Watch List",
     "📈  Regional Analysis",
-    "🔍  Site Explorer"
+    "🔍  Site Explorer",
+    "🔮  Forecasting",
+    "🌊  Seasonal Patterns"
 ])
 
 # ═════════════════════════════════════════════
@@ -492,8 +530,8 @@ with tab1:
     st.subheader("Alert Performance Context: What's Driving the Alerts?")
     st.markdown("""
     Out of all **Alert-tier stores**, understanding the performance direction is critical:
-    - **🔻 Negative-Performing** - Stores underperforming vs baseline (Z-score < -2σ) → **Need immediate intervention**
-    - **🔺 Positive-Performing** - Stores outperforming vs baseline (Z-score > +2σ) → **Best-practice candidates, possible data quality issues, or extreme outliers**
+    - **🔻 Negative-Performing** — Stores underperforming vs baseline (Z-score < -2σ) — **Need immediate intervention**
+    - **🔺 Positive-Performing** — Stores outperforming vs baseline (Z-score > +2σ) — **Best-practice candidates, possible data quality issues, or extreme outliers**
     """)
 
     critical_sites = filtered_data[filtered_data['alert_tier'] == 'Alert'].copy()
@@ -514,13 +552,13 @@ with tab1:
 
     with col_kpi_neg:
         neg_pct = (neg_count / total_alert_count * 100) if total_alert_count > 0 else 0
-        st.markdown(f"<div style='text-align: center; padding: 1.75rem; background: #FFFFFF; border-radius: 8px; border: 2px solid #E74C3C; box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);'><p style='font-size: 12px; color: #667A8C; margin: 0 0 0.75rem 0; font-weight: 600; letter-spacing: 0.5px;'>🔻 UNDERPERFORMING</p><p style='font-size: 36px; font-weight: 700; color: #E74C3C; margin: 0;'>{neg_count}</p><p style='font-size: 11px; color: #8B95A5; margin: 0.75rem 0 0 0;'>{neg_pct:.1f}% of alerts</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; padding: 1.75rem; background: #FFFFFF; border-radius: 8px; border: 2px solid #E74C3C; box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);'><p style='font-size: 12px; color: #667A8C; margin: 0 0 0.75rem 0; font-weight: 600; letter-spacing: 0.5px;'>🔻 NEGATIVE-PERFORMING</p><p style='font-size: 36px; font-weight: 700; color: #E74C3C; margin: 0;'>{neg_count}</p><p style='font-size: 11px; color: #8B95A5; margin: 0.75rem 0 0 0;'>{neg_pct:.1f}% of alerts</p></div>", unsafe_allow_html=True)
         if len(neg_critical) > 0:
             st.markdown(f"<p style='text-align: center; font-size: 11px; color: #667A8C; margin-top: 0.5rem;'>Avg Score: <strong>{neg_critical['weighted_negative_score'].mean():.1f}</strong> | Driver: <strong>{neg_critical['primary_driver'].mode().iloc[0] if len(neg_critical) > 0 else 'N/A'}</strong></p>", unsafe_allow_html=True)
 
     with col_kpi_pos:
         pos_pct = (pos_count / total_alert_count * 100) if total_alert_count > 0 else 0
-        st.markdown(f"<div style='text-align: center; padding: 1.75rem; background: #FFFFFF; border-radius: 8px; border: 2px solid #28A745; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.1);'><p style='font-size: 12px; color: #667A8C; margin: 0 0 0.75rem 0; font-weight: 600; letter-spacing: 0.5px;'>🔺 OUTPERFORMING</p><p style='font-size: 36px; font-weight: 700; color: #28A745; margin: 0;'>{pos_count}</p><p style='font-size: 11px; color: #8B95A5; margin: 0.75rem 0 0 0;'>{pos_pct:.1f}% of alerts</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; padding: 1.75rem; background: #FFFFFF; border-radius: 8px; border: 2px solid #28A745; box-shadow: 0 2px 8px rgba(40, 167, 69, 0.1);'><p style='font-size: 12px; color: #667A8C; margin: 0 0 0.75rem 0; font-weight: 600; letter-spacing: 0.5px;'>🔺 POSITIVE-PERFORMING</p><p style='font-size: 36px; font-weight: 700; color: #28A745; margin: 0;'>{pos_count}</p><p style='font-size: 11px; color: #8B95A5; margin: 0.75rem 0 0 0;'>{pos_pct:.1f}% of alerts</p></div>", unsafe_allow_html=True)
         if len(pos_critical) > 0:
             st.markdown(f"<p style='text-align: center; font-size: 11px; color: #667A8C; margin-top: 0.5rem;'>Avg Score: <strong>{pos_critical['weighted_positive_score'].mean():.1f}</strong> | Driver: <strong>{pos_critical['primary_driver'].mode().iloc[0] if len(pos_critical) > 0 else 'N/A'}</strong></p>", unsafe_allow_html=True)
 
@@ -528,54 +566,136 @@ with tab1:
     
     # Anomaly Detection Methodology - For Management Understanding
     with st.expander("📊 How Are Anomalies Calculated? (Methodology)", expanded=False):
+
+        # ── Row 1: Detection Pipeline (full width) ──
+        st.markdown("""
+<div style="background: #F0F4FA; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1rem; font-size: 13px; line-height: 1.8; color: #2C3E50;">
+<strong style="font-size: 15px; color: #1A365D;">Detection Pipeline</strong>&nbsp;&nbsp;<span style="font-size: 12px; color: #667A8C;">Each store is compared against <em>its own</em> recent performance — not the network average.</span>
+<table style="width: 100%; border-collapse: collapse; margin-top: 0.6rem; font-size: 13px;">
+<tr style="border-bottom: 1px solid #D0E0F0;">
+  <td style="padding: 6px 10px; width: 24px; font-weight: 700; color: #1E7BC0; vertical-align: top;">1.</td>
+  <td style="padding: 6px 10px;"><strong>Baseline</strong> — 4-week rolling mean &amp; std of each KPI (lagged 1 week to avoid self-reference)</td>
+</tr>
+<tr style="border-bottom: 1px solid #D0E0F0;">
+  <td style="padding: 6px 10px; font-weight: 700; color: #1E7BC0; vertical-align: top;">2.</td>
+  <td style="padding: 6px 10px;"><strong>Z-Score</strong> — <code style="background: #E8EFF6; padding: 2px 6px; border-radius: 3px;">Z = (Current Week − Rolling Mean) / Rolling Std</code></td>
+</tr>
+<tr style="border-bottom: 1px solid #D0E0F0;">
+  <td style="padding: 6px 10px; font-weight: 700; color: #1E7BC0; vertical-align: top;">3.</td>
+  <td style="padding: 6px 10px;"><strong>Flag</strong> — Triggered when <code style="background: #E8EFF6; padding: 2px 6px; border-radius: 3px;">|Z| &gt; 2.0σ</code>, store has ≥ 8 weeks history, and data quality passes (no zero-slot weeks)</td>
+</tr>
+<tr style="border-bottom: 1px solid #D0E0F0;">
+  <td style="padding: 6px 10px; font-weight: 700; color: #1E7BC0; vertical-align: top;">4.</td>
+  <td style="padding: 6px 10px;"><strong>Direction Split</strong> — Each flag classified as <strong style="color: #E74C3C;">negative</strong> (bad) or <strong style="color: #27AE60;">positive</strong> (good). For most KPIs a drop is bad; for Exam-Only % and Patient Fallout a <em>spike</em> is bad.</td>
+</tr>
+<tr style="border-bottom: 1px solid #D0E0F0;">
+  <td style="padding: 6px 10px; font-weight: 700; color: #1E7BC0; vertical-align: top;">5.</td>
+  <td style="padding: 6px 10px;"><strong>Weighted Score</strong> — <code style="background: #E8EFF6; padding: 2px 6px; border-radius: 3px;">weighted_neg = Σ(neg_flag × weight)</code> &nbsp;&nbsp; <code style="background: #E8EFF6; padding: 2px 6px; border-radius: 3px;">weighted_pos = Σ(pos_flag × weight)</code></td>
+</tr>
+<tr>
+  <td style="padding: 6px 10px; font-weight: 700; color: #1E7BC0; vertical-align: top;">6.</td>
+  <td style="padding: 6px 10px;"><strong>Primary Driver</strong> — The KPI with the highest |Z-score| is tagged as the single metric most responsible.</td>
+</tr>
+</table>
+</div>
+""", unsafe_allow_html=True)
+
+        # ── Row 2: Two balanced columns ──
         col_method1, col_method2 = st.columns(2)
 
         with col_method1:
             st.markdown("""
-            **Statistical Detection Method:**
+<div style="background: #FFFFFF; border: 1px solid #E5E9F0; border-radius: 8px; padding: 1rem 1.25rem; height: 100%; font-size: 13px; line-height: 1.7; color: #2C3E50;">
 
-            Each location is evaluated against a baseline using **Z-Score Analysis**:
-
-            1. **Baseline Creation** - 4-week rolling average of each KPI metric (lagged)
-            2. **Deviation Calculation** - Measure how far current week deviates from baseline
-            3. **Threshold** - Flag triggered when deviation exceeds ±2.0 standard deviations
-            4. **Direction-Aware Scoring** - Flags split into negative (underperforming) and positive (outperforming)
-            5. **Weighted Anomaly Score** - KPIs weighted by business importance (POS Sales & Utilization = 2x)
-
-            **Alert Tiers (Weighted):**
-            - 🔴 **Alert (≥4.0 weighted)** - Multiple KPIs anomalous → Immediate Action
-            - 🟡 **Watch (≥2.5 weighted)** - KPIs trending anomalous → Monitor Closely
-            - 🟢 **Noise/Clean (<2.5)** - Normal variation → Routine Monitoring
-
-            **Positive vs Negative Classification:**
-            - 🔻 **Negative-Performing** - Z-score < -2σ → Store underperforming vs baseline
-            - 🔺 **Positive-Performing** - Z-score > +2σ → Store outperforming vs baseline
-            """)
+<strong style="font-size: 14px; color: #1A365D;">10 KPIs Scored</strong>&nbsp;&nbsp;<span style="font-size: 11px; color: #667A8C;">7 Core + 3 Leading Indicators</span>
+<table style="width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 12px;">
+<thead>
+<tr style="border-bottom: 2px solid #1E7BC0;">
+  <th style="text-align: left; padding: 5px 8px; color: #1A365D;">KPI</th>
+  <th style="text-align: center; padding: 5px 8px; color: #1A365D;">Weight</th>
+  <th style="text-align: center; padding: 5px 8px; color: #1A365D;">Bad Direction</th>
+</tr>
+</thead>
+<tbody>
+<tr style="background: #F7F9FC;"><td style="padding: 4px 8px;"><strong>POS Sales</strong></td><td style="padding: 4px 8px; text-align: center; font-weight: 700; color: #E74C3C;">2.0</td><td style="padding: 4px 8px; text-align: center;">Drop ↓</td></tr>
+<tr><td style="padding: 4px 8px;"><strong>Utilization</strong></td><td style="padding: 4px 8px; text-align: center; font-weight: 700; color: #E74C3C;">2.0</td><td style="padding: 4px 8px; text-align: center;">Drop ↓</td></tr>
+<tr style="background: #F7F9FC;"><td style="padding: 4px 8px;"><strong>ASP</strong></td><td style="padding: 4px 8px; text-align: center; font-weight: 600; color: #E67E22;">1.5</td><td style="padding: 4px 8px; text-align: center;">Drop ↓</td></tr>
+<tr><td style="padding: 4px 8px;"><strong>Exam-Only %</strong></td><td style="padding: 4px 8px; text-align: center; font-weight: 600; color: #E67E22;">1.5</td><td style="padding: 4px 8px; text-align: center;">Spike ↑</td></tr>
+<tr style="background: #F7F9FC;"><td style="padding: 4px 8px;"><strong>EPP %</strong></td><td style="padding: 4px 8px; text-align: center;">1.0</td><td style="padding: 4px 8px; text-align: center;">Drop ↓</td></tr>
+<tr><td style="padding: 4px 8px;"><strong>RI %</strong></td><td style="padding: 4px 8px; text-align: center;">1.0</td><td style="padding: 4px 8px; text-align: center;">Drop ↓</td></tr>
+<tr style="background: #F7F9FC;"><td style="padding: 4px 8px;"><strong>MAS %</strong></td><td style="padding: 4px 8px; text-align: center;">1.0</td><td style="padding: 4px 8px; text-align: center;">Drop ↓</td></tr>
+<tr style="border-top: 1px dashed #8B95A5;"><td style="padding: 4px 8px;"><strong>Appts Created</strong> <span style="color: #8B95A5; font-size: 10px;">LEADING</span></td><td style="padding: 4px 8px; text-align: center;">1.0</td><td style="padding: 4px 8px; text-align: center;">Drop ↓</td></tr>
+<tr style="background: #F7F9FC;"><td style="padding: 4px 8px;"><strong>Patient Fallout</strong> <span style="color: #8B95A5; font-size: 10px;">LEADING</span></td><td style="padding: 4px 8px; text-align: center; font-weight: 600; color: #E67E22;">1.5</td><td style="padding: 4px 8px; text-align: center;">Spike ↑</td></tr>
+<tr><td style="padding: 4px 8px;"><strong>Comp Exam %</strong> <span style="color: #8B95A5; font-size: 10px;">LEADING</span></td><td style="padding: 4px 8px; text-align: center;">1.0</td><td style="padding: 4px 8px; text-align: center;">Drop ↓</td></tr>
+</tbody>
+</table>
+</div>
+""", unsafe_allow_html=True)
 
         with col_method2:
             st.markdown("""
-            **10 KPIs Analyzed (7 Core + 3 Leading Indicators):**
+<div style="background: #FFFFFF; border: 1px solid #E5E9F0; border-radius: 8px; padding: 1rem 1.25rem; height: 100%; font-size: 13px; line-height: 1.7; color: #2C3E50;">
 
-            *Core KPIs:*
-            1. **POS Sales** (weight: 2.0) - Total revenue from point-of-sale transactions
-            2. **Utilization** (weight: 2.0) - Percentage of available exam chair time used
-            3. **ASP** (weight: 1.5) - Average revenue per transaction
-            4. **EO %** (weight: 1.5) - Exam-Only percentage
-            5. **EPP %** (weight: 1.0) - Exam + Products percentage
-            6. **RI %** (weight: 1.0) - Retail Item percentage
-            7. **MAS %** (weight: 1.0) - Materials/Services percentage
+<strong style="font-size: 14px; color: #1A365D;">Alert Tiers</strong>
+<table style="width: 100%; border-collapse: collapse; margin: 0.4rem 0 0.8rem 0; font-size: 12px;">
+<tr style="border-bottom: 1px solid #E5E9F0;">
+  <td style="padding: 5px 8px;">🔴 <strong>Alert</strong></td>
+  <td style="padding: 5px 8px;"><code style="background: #E8EFF6; padding: 1px 5px; border-radius: 3px;">weighted_neg ≥ 4.0</code></td>
+  <td style="padding: 5px 8px; color: #E74C3C; font-weight: 600;">Immediate action</td>
+</tr>
+<tr style="border-bottom: 1px solid #E5E9F0;">
+  <td style="padding: 5px 8px;">🟡 <strong>Watch</strong></td>
+  <td style="padding: 5px 8px;"><code style="background: #E8EFF6; padding: 1px 5px; border-radius: 3px;">weighted_neg ≥ 2.5</code></td>
+  <td style="padding: 5px 8px; color: #E67E22; font-weight: 600;">Active monitoring</td>
+</tr>
+<tr style="border-bottom: 1px solid #E5E9F0;">
+  <td style="padding: 5px 8px;">🟢 <strong>Noise/Clean</strong></td>
+  <td style="padding: 5px 8px;"><code style="background: #E8EFF6; padding: 1px 5px; border-radius: 3px;">weighted_neg &lt; 2.5</code></td>
+  <td style="padding: 5px 8px; color: #27AE60; font-weight: 600;">Normal variation</td>
+</tr>
+<tr>
+  <td style="padding: 5px 8px;">⭐ <strong>Positive Outlier</strong></td>
+  <td style="padding: 5px 8px;"><code style="background: #E8EFF6; padding: 1px 5px; border-radius: 3px;">weighted_pos ≥ 3.0</code></td>
+  <td style="padding: 5px 8px; color: #1E7BC0; font-weight: 600;">Best-practice candidate</td>
+</tr>
+</table>
 
-            *Leading Indicators:*
+<strong style="font-size: 14px; color: #1A365D;">Anomaly Type Rules</strong>
+<table style="width: 100%; border-collapse: collapse; margin: 0.4rem 0 0.8rem 0; font-size: 12px;">
+<tr style="border-bottom: 1px solid #E5E9F0;"><td style="padding: 4px 8px; font-weight: 600;">Medicaid Payer Mix Shift</td><td style="padding: 4px 8px; color: #667A8C;">utilization + asp flagged, is_medicaid = 1</td></tr>
+<tr style="border-bottom: 1px solid #E5E9F0;"><td style="padding: 4px 8px; font-weight: 600;">Pricing / Mix Issue</td><td style="padding: 4px 8px; color: #667A8C;">asp flagged, or pos_sales + asp flagged</td></tr>
+<tr style="border-bottom: 1px solid #E5E9F0;"><td style="padding: 4px 8px; font-weight: 600;">Low Exam Conversion</td><td style="padding: 4px 8px; color: #667A8C;">epp_pct flagged, or eo_pct + epp_pct flagged</td></tr>
+<tr style="border-bottom: 1px solid #E5E9F0;"><td style="padding: 4px 8px; font-weight: 600;">Tele-Opt Capacity Watch</td><td style="padding: 4px 8px; color: #667A8C;">utilization flagged, is_tele_opt = 1</td></tr>
+<tr style="border-bottom: 1px solid #E5E9F0;"><td style="padding: 4px 8px; font-weight: 600;">Operational Risk</td><td style="padding: 4px 8px; color: #667A8C;">utilization flagged (non-Medicaid, non-Tele-Opt)</td></tr>
+<tr style="border-bottom: 1px solid #E5E9F0;"><td style="padding: 4px 8px; font-weight: 600;">Demand Warning</td><td style="padding: 4px 8px; color: #667A8C;">appts_created or patient_fallout flagged</td></tr>
+<tr><td style="padding: 4px 8px; font-weight: 600;">Multi-KPI Watch</td><td style="padding: 4px 8px; color: #667A8C;">2+ KPIs flagged, no specific pattern</td></tr>
+</table>
 
-            8. **Appts Created** (weight: 1.0) - Appointment generation
-            9. **Patient Fallout** (weight: 1.5) - Cancellations + no-shows
-            10. **Comp Exam %** (weight: 1.0) - Comprehensive exam share
+<strong style="font-size: 14px; color: #1A365D;">Direction Classification</strong><br>
+🔻 <strong>Negative</strong> — KPI deviates in the <em>bad</em> direction (e.g., sales drop, fallout spike)<br>
+🔺 <strong>Positive</strong> — KPI deviates in the <em>good</em> direction (e.g., sales spike, fallout drop)
+</div>
+""", unsafe_allow_html=True)
 
-            **Why This Matters:**
-            - Direction-aware scoring separates underperformers from outperformers
-            - Weighted scoring prioritizes high-impact KPIs
-            - Leading indicators provide early warning before core KPIs deteriorate
-            """)
+        # ── Row 3: Data Quality + Why This Approach (full width) ──
+        st.markdown("""
+<div style="display: flex; gap: 1rem; margin-top: 1rem;">
+  <div style="flex: 1; background: #F7F9FC; border: 1px solid #E5E9F0; border-radius: 8px; padding: 0.8rem 1.25rem; font-size: 12px; line-height: 1.7; color: #2C3E50;">
+    <strong style="font-size: 13px; color: #1A365D;">Data Quality Guards</strong><br>
+    • Stores need <strong>≥ 8 weeks</strong> of history before scoring &nbsp;
+    • Weeks with <strong>zero exam slots</strong> excluded &nbsp;
+    • <strong>Partial trailing weeks</strong> (&lt;50% of prior week) dropped &nbsp;
+    • Each store compared against <em>its own baseline</em>, not a network average
+  </div>
+  <div style="flex: 1; background: #F7F9FC; border: 1px solid #E5E9F0; border-radius: 8px; padding: 0.8rem 1.25rem; font-size: 12px; line-height: 1.7; color: #2C3E50;">
+    <strong style="font-size: 13px; color: #1A365D;">Why This Approach?</strong><br>
+    • <strong>Direction-aware</strong> — separates underperformers from outperformers in a single score<br>
+    • <strong>Weighted</strong> — POS Sales &amp; Utilization count 2x because they drive revenue directly<br>
+    • <strong>Leading indicators</strong> — early warning <em>before</em> core KPIs deteriorate<br>
+    • <strong>Self-referencing</strong> — avoids penalizing small stores or rewarding large ones
+  </div>
+</div>
+""", unsafe_allow_html=True)
     
     st.divider()
     
@@ -703,8 +823,8 @@ with tab2:
     st.subheader("Alert Performance Breakdown")
     st.markdown("""
     Understanding the composition of alert-tier stores:
-    - **🔻 Negative-Performing** (Z-score < -2σ) → Stores underperforming vs baseline, need immediate intervention
-    - **🔺 Positive-Performing** (Z-score > +2σ) → Stores outperforming vs baseline, best-practice candidates or data anomalies
+    - **🔻 Negative-Performing** — Stores underperforming vs baseline (Z-score < -2σ) — **Need immediate intervention**
+    - **🔺 Positive-Performing** — Stores outperforming vs baseline (Z-score > +2σ) — **Best-practice candidates or data anomalies**
     """)
     
     # Calculate positive vs negative breakdown
@@ -722,15 +842,15 @@ with tab2:
     
     with col_alert_neg:
         neg_pct = (neg_alert_count / total_alert_count * 100) if total_alert_count > 0 else 0
-        st.markdown(f"<div style='text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #FFE8E8 0%, #FFD6D6 100%); border-radius: 12px; border: 1px solid #D4737A; border-left: 5px solid #B71C1C;'><p style='font-size: 14px; color: #666; margin: 0 0 0.5rem 0; font-weight: bold;'>🔻 Negative-Performing</p><p style='font-size: 32px; font-weight: bold; color: #B71C1C; margin: 0;'>{neg_alert_count}</p><p style='font-size: 11px; color: #999; margin: 0.5rem 0 0 0;'>{neg_pct:.1f}% of alerts</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #FFE8E8 0%, #FFD6D6 100%); border-radius: 12px; border: 1px solid #D4737A; border-left: 5px solid #E74C3C;'><p style='font-size: 14px; color: #666; margin: 0 0 0.5rem 0; font-weight: bold;'>🔻 Negative-Performing</p><p style='font-size: 32px; font-weight: bold; color: #E74C3C; margin: 0;'>{neg_alert_count}</p><p style='font-size: 11px; color: #999; margin: 0.5rem 0 0 0;'>{neg_pct:.1f}% of alerts</p></div>", unsafe_allow_html=True)
         if len(neg_alerts) > 0:
-            st.caption(f"Avg Score: **{neg_alerts['weighted_negative_score'].mean():.1f}** | Top Driver: **{neg_alerts['primary_driver'].mode().iloc[0] if len(neg_alerts) > 0 else 'N/A'}**")
-    
+            st.markdown(f"<p style='text-align: center; font-size: 11px; color: #667A8C; margin-top: 0.5rem;'>Avg Score: <strong>{neg_alerts['weighted_negative_score'].mean():.1f}</strong> | Top Driver: <strong>{neg_alerts['primary_driver'].mode().iloc[0] if len(neg_alerts) > 0 else 'N/A'}</strong></p>", unsafe_allow_html=True)
+
     with col_alert_pos:
         pos_pct = (pos_alert_count / total_alert_count * 100) if total_alert_count > 0 else 0
-        st.markdown(f"<div style='text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); border-radius: 12px; border: 1px solid #A5D6A7; border-left: 5px solid #1B5E20;'><p style='font-size: 14px; color: #666; margin: 0 0 0.5rem 0; font-weight: bold;'>🔺 Positive-Performing</p><p style='font-size: 32px; font-weight: bold; color: #1B5E20; margin: 0;'>{pos_alert_count}</p><p style='font-size: 11px; color: #999; margin: 0.5rem 0 0 0;'>{pos_pct:.1f}% of alerts</p></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #E8F5E9 0%, #C8E6C9 100%); border-radius: 12px; border: 1px solid #A5D6A7; border-left: 5px solid #28A745;'><p style='font-size: 14px; color: #666; margin: 0 0 0.5rem 0; font-weight: bold;'>🔺 Positive-Performing</p><p style='font-size: 32px; font-weight: bold; color: #28A745; margin: 0;'>{pos_alert_count}</p><p style='font-size: 11px; color: #999; margin: 0.5rem 0 0 0;'>{pos_pct:.1f}% of alerts</p></div>", unsafe_allow_html=True)
         if len(pos_alerts) > 0:
-            st.caption(f"Avg Score: **{pos_alerts['weighted_positive_score'].mean():.1f}** | Top Driver: **{pos_alerts['primary_driver'].mode().iloc[0] if len(pos_alerts) > 0 else 'N/A'}**")
+            st.markdown(f"<p style='text-align: center; font-size: 11px; color: #667A8C; margin-top: 0.5rem;'>Avg Score: <strong>{pos_alerts['weighted_positive_score'].mean():.1f}</strong> | Top Driver: <strong>{pos_alerts['primary_driver'].mode().iloc[0] if len(pos_alerts) > 0 else 'N/A'}</strong></p>", unsafe_allow_html=True)
     
     st.divider()
     
@@ -757,7 +877,7 @@ with tab2:
         fig = go.Figure(data=[go.Bar(y=region_dist.index, x=region_dist.values, orientation='h',
                                      text=region_dist.values,
                                      textposition='inside',
-                                     textfont=dict(size=12, color='white', family='Arial Black'),
+                                     textfont=dict(size=12, color='black', family='Arial Black'),
                                      marker=dict(color='#1E7BC0'))])
         fig.update_layout(title="", xaxis_title="Count", yaxis_title="", height=400, showlegend=False,
                          plot_bgcolor='#FAFAFA', paper_bgcolor='white',
@@ -768,8 +888,8 @@ with tab2:
     st.divider()
     
     # Alert sites - Split into Negative vs Positive performing
-    st.subheader("Negative-Performing Alert Sites (Underperformers)")
-    st.markdown("<p style='font-size: 13px; color: #DC2626;'><strong>● Red Alert:</strong> Sites underperforming vs baseline - <strong>Require immediate intervention</strong></p>", unsafe_allow_html=True)
+    st.subheader("🔻 Negative-Performing Alert Sites (Underperformers)")
+    st.markdown("<p style='font-size: 13px; color: #DC2626;'><strong>Red Alert:</strong> Sites underperforming vs baseline — <strong>Require immediate intervention</strong></p>", unsafe_allow_html=True)
     
     display_cols = ['site_id', 'site_name', 'Region', 'Quad', 'anomaly_score',
                    'weighted_negative_score', 'weighted_positive_score',
@@ -792,8 +912,8 @@ with tab2:
     
     st.divider()
     
-    st.subheader("● Positive-Performing Alert Sites (Outperformers)")
-    st.markdown("<p style='font-size: 13px; color: #059669;'><strong>● Green Alert:</strong> Sites outperforming vs baseline - <strong>Best-practice candidates or potential data quality issues</strong></p>", unsafe_allow_html=True)
+    st.subheader("🔺 Positive-Performing Alert Sites (Outperformers)")
+    st.markdown("<p style='font-size: 13px; color: #059669;'><strong>Green Alert:</strong> Sites outperforming vs baseline — <strong>Best-practice candidates or potential data quality issues</strong></p>", unsafe_allow_html=True)
     
     if len(pos_alerts) > 0:
         pos_display_df = pos_alerts[[c for c in display_cols if c in pos_alerts.columns]].copy()
@@ -917,8 +1037,8 @@ with tab4:
     st.subheader("Alerts by Region: Negative vs Positive Performance")
     st.markdown("""
     Alert-tier stores split by performance direction:
-    - **🔻 Negative-Performing** (Z-score < -2σ): Underperforming stores requiring immediate intervention
-    - **🔺 Positive-Performing** (Z-score > +2σ): Outperforming stores — best-practice candidates
+    - **🔻 Negative-Performing** — Stores underperforming vs baseline (Z-score < -2σ) — **Need immediate intervention**
+    - **🔺 Positive-Performing** — Stores outperforming vs baseline (Z-score > +2σ) — **Best-practice candidates**
     """)
 
     critical_sites = filtered_data[filtered_data['alert_tier'] == 'Alert'].copy()
@@ -1000,11 +1120,11 @@ with tab4:
                 go.Bar(name='Negative-Performing', x=neg_by_region.index, y=neg_by_region.values,
                        marker=dict(color='#FF4444'),
                        text=neg_by_region.values, textposition='inside',
-                       textfont=dict(size=10, color='white', family='Arial Black')),
+                       textfont=dict(size=10, color='black', family='Arial Black')),
                 go.Bar(name='Positive-Performing', x=pos_by_region.index, y=pos_by_region.values,
                        marker=dict(color='#4CAF50'),
                        text=pos_by_region.values, textposition='inside',
-                       textfont=dict(size=10, color='white', family='Arial Black'))
+                       textfont=dict(size=10, color='black', family='Arial Black'))
             ])
             fig_perf.update_layout(
                 barmode='group', 
@@ -1164,6 +1284,415 @@ with tab5:
         st.write(f"**Property Type:** {site_data['property_type']}")
         st.write(f"**Sq Footage:** {site_data['sq_footage']:.0f}" if pd.notna(site_data['sq_footage']) else "")
         st.write(f"**Exam Lanes:** {site_data['exam_lanes']:.0f}" if pd.notna(site_data['exam_lanes']) else "")
+
+# ═════════════════════════════════════════════
+# TAB 6: FORECASTING
+# ═════════════════════════════════════════════
+with tab6:
+    st.header("🔮 Forecasting")
+    st.markdown("<p style='color: #667A8C; font-size: 13px; margin-bottom: 1.5rem;'>Store-level sales projections, model confidence, and cohort-based trend analysis powered by diagnostic models.</p>", unsafe_allow_html=True)
+
+    # ── Section 1: Sales Projections by Cohort ──
+    st.subheader("Sales Projections by Cohort")
+
+    # Group selector for projections
+    proj_groups = projections['group'].unique().tolist()
+    selected_proj_groups = st.multiselect(
+        "Select cohort groups to display",
+        options=proj_groups,
+        default=[g for g in ['Network', 'Healthy', 'Offenders'] if g in proj_groups],
+        key="proj_groups"
+    )
+
+    if selected_proj_groups:
+        proj_filtered = projections[projections['group'].isin(selected_proj_groups)].copy()
+
+        # Define color scheme
+        color_map = {
+            'Network': '#1E7BC0',
+            'Healthy': '#27AE60',
+            'Offenders': '#E74C3C',
+            'Offender Degradation (2x)': '#E67E22'
+        }
+
+        fig_proj = go.Figure()
+
+        for group_name in selected_proj_groups:
+            gdata = proj_filtered[proj_filtered['group'] == group_name]
+            historical = gdata[gdata['type'] == 'historical']
+            forecast = gdata[gdata['type'] == 'projection']
+            color = color_map.get(group_name, '#8B95A5')
+
+            # Historical line (solid)
+            fig_proj.add_trace(go.Scatter(
+                x=historical['quarter'], y=historical['pos_sales'],
+                mode='lines+markers',
+                name=f'{group_name} (Actual)',
+                line=dict(color=color, width=2.5),
+                marker=dict(size=7, color=color),
+                legendgroup=group_name
+            ))
+
+            # Forecast line (dashed)
+            if not forecast.empty:
+                # Connect forecast to last historical point
+                bridge = pd.concat([historical.tail(1), forecast])
+                fig_proj.add_trace(go.Scatter(
+                    x=bridge['quarter'], y=bridge['pos_sales'],
+                    mode='lines+markers',
+                    name=f'{group_name} (Forecast)',
+                    line=dict(color=color, width=2.5, dash='dash'),
+                    marker=dict(size=6, color=color, symbol='diamond'),
+                    legendgroup=group_name
+                ))
+
+        # Add vertical line at forecast boundary
+        all_quarters = sorted(projections['quarter'].unique())
+        hist_quarters = sorted(projections[projections['type'] == 'historical']['quarter'].unique())
+        if len(hist_quarters) > 0:
+            last_hist = hist_quarters[-1]
+            last_hist_idx = all_quarters.index(last_hist)
+            fig_proj.add_shape(
+                type="line", x0=last_hist_idx + 0.5, x1=last_hist_idx + 0.5,
+                y0=0, y1=1, yref="paper",
+                line=dict(color="#667A8C", width=1, dash="dot")
+            )
+            fig_proj.add_annotation(
+                x=last_hist, y=1.05, yref="paper",
+                text="Forecast Start", showarrow=False,
+                font=dict(size=11, color="#667A8C")
+            )
+
+        fig_proj.update_layout(
+            title=None,
+            xaxis_title="Quarter",
+            yaxis_title="Avg Weekly POS Sales ($)",
+            yaxis_tickprefix="$", yaxis_tickformat=",.0f",
+            template="plotly_white",
+            height=480,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            hovermode="x unified",
+            margin=dict(l=60, r=30, t=40, b=60)
+        )
+        st.plotly_chart(fig_proj, use_container_width=True)
+
+        # Summary metrics
+        st.markdown("**Projected Growth Rates (Quarterly)**")
+        metric_cols = st.columns(len(selected_proj_groups))
+        for i, group_name in enumerate(selected_proj_groups):
+            gdata = projections[projections['group'] == group_name]
+            hist = gdata[gdata['type'] == 'historical']
+            proj = gdata[gdata['type'] == 'projection']
+            if not hist.empty and not proj.empty:
+                first_hist = hist['pos_sales'].iloc[0]
+                last_hist = hist['pos_sales'].iloc[-1]
+                last_proj = proj['pos_sales'].iloc[-1]
+                hist_change = ((last_hist - first_hist) / first_hist) * 100
+                proj_change = ((last_proj - last_hist) / last_hist) * 100
+                with metric_cols[i]:
+                    st.metric(
+                        label=group_name,
+                        value=f"${last_hist:,.0f}",
+                        delta=f"{proj_change:+.1f}% projected"
+                    )
+    else:
+        st.info("Select at least one cohort group to display projections.")
+
+    st.divider()
+
+    # ── Section 2: Model Fit Confidence (R²) ──
+    st.subheader("Model Fit Confidence (R²)")
+    st.markdown("<p style='color: #667A8C; font-size: 13px;'>Rolling 13-week R² values measuring how well the linear trend explains weekly variation over time.</p>", unsafe_allow_html=True)
+
+    # KPI selector for structural breaks
+    sb_kpis = structural_breaks['kpi_label'].unique().tolist()
+    selected_sb_kpi = st.selectbox("Select KPI", sb_kpis, index=0, key="sb_kpi")
+
+    sb_data = structural_breaks[structural_breaks['kpi_label'] == selected_sb_kpi].sort_values('date')
+
+    if not sb_data.empty:
+        # R-squared over time
+        fig_r2 = go.Figure()
+        fig_r2.add_trace(go.Scatter(
+            x=sb_data['date'], y=sb_data['r_squared'],
+            mode='lines',
+            name='R²',
+            line=dict(color='#1E7BC0', width=2),
+            fill='tozeroy',
+            fillcolor='rgba(30, 123, 192, 0.1)'
+        ))
+        fig_r2.add_hline(y=0.3, line_dash="dot", line_color="#E67E22",
+                         annotation_text="Strong trend threshold (R²=0.3)",
+                         annotation_position="top right",
+                         annotation_font_size=11)
+
+        fig_r2.update_layout(
+            title=None,
+            xaxis_title="Week",
+            yaxis_title="R-Squared",
+            yaxis_range=[0, 1],
+            template="plotly_white",
+            height=350,
+            margin=dict(l=60, r=30, t=30, b=60)
+        )
+        st.plotly_chart(fig_r2, use_container_width=True)
+
+        # Summary stats
+        recent_slopes = sb_data.tail(4)
+        avg_recent_slope = recent_slopes['slope'].mean()
+        avg_recent_r2 = recent_slopes['r_squared'].mean()
+        trend_direction = "Upward" if avg_recent_slope > 0 else "Downward"
+
+        scol1, scol2, scol3 = st.columns(3)
+        with scol1:
+            st.metric("Recent Trend (4-wk avg)", trend_direction, f"{avg_recent_slope:+.2f}/week")
+        with scol2:
+            st.metric("Model Confidence (R²)", f"{avg_recent_r2:.3f}")
+        with scol3:
+            sig_weeks = len(sb_data[sb_data['p_value'] < 0.05])
+            st.metric("Significant Weeks", f"{sig_weeks}/{len(sb_data)}", f"{sig_weeks/len(sb_data)*100:.0f}%")
+
+    st.divider()
+
+    # ── Section 3: Cohort Definitions & Forecast Methodology ──
+    st.subheader("Cohort Definitions & Forecast Methodology")
+
+    st.markdown("""
+<div style="background: #F0F4FA; border-left: 4px solid #1E7BC0; padding: 1rem 1.2rem; border-radius: 0 6px 6px 0; margin-bottom: 1.2rem; font-size: 13px; line-height: 1.7; color: #2C3E50;">
+    <strong style="font-size: 14px; color: #1A365D;">Cohort Definitions</strong><br>
+    <strong style="color: #1E7BC0;">Network</strong> — All ~1,000 MyEyeDr stores aggregated. Represents the overall company baseline for average weekly POS sales.<br>
+    <strong style="color: #27AE60;">Healthy</strong> — Stores <em>not</em> classified as offenders. These locations consistently perform at or above KPI benchmarks and drive the majority of network revenue growth.<br>
+    <strong style="color: #E74C3C;">Offenders</strong> — Stores identified through two criteria: <em>(1) Liability stores</em> — utilization above the network median but POS sales below the median (high capacity, low revenue), and <em>(2) Persistent bottom-5%</em> — stores whose average falls in the bottom 5th percentile (or top 5th for exam-only rate) on any of the 7 scored KPIs.<br>
+    <strong style="color: #E67E22;">Offender Degradation (2x)</strong> — A stress-test scenario projecting offender performance if their current quarterly decline rate doubles, illustrating the financial risk of inaction.
+</div>
+<div style="background: #FFFBF0; border-left: 4px solid #E67E22; padding: 1rem 1.2rem; border-radius: 0 6px 6px 0; margin-bottom: 1.2rem; font-size: 13px; line-height: 1.7; color: #2C3E50;">
+    <strong style="font-size: 14px; color: #1A365D;">Forecast Methodology</strong><br>
+    Projections use <strong>simple linear regression (OLS)</strong> fitted on quarterly-aggregated historical data (9 quarters: 2024 Q1 – 2026 Q1).<br>
+    <strong>Dependent variable (Y):</strong> Average weekly POS Sales ($) per store within each cohort.<br>
+    <strong>Independent variable (X):</strong> Time index (sequential quarter number, e.g. Q1=0, Q2=1, …).<br>
+    For each cohort, the model estimates a <em>slope</em> ($/quarter growth rate) and <em>intercept</em>, then extrapolates forward 20 quarters (~5 years) using <code>Y = slope &times; t + intercept</code>.<br>
+    The Offender Degradation (2x) scenario doubles the offender slope to model accelerated decline.
+</div>
+<div style="background: #F5F0FA; border-left: 4px solid #7C3AED; padding: 1rem 1.2rem; border-radius: 0 6px 6px 0; margin-bottom: 1.2rem; font-size: 13px; line-height: 1.7; color: #2C3E50;">
+    <strong style="font-size: 14px; color: #1A365D;">Sales Driver Regression (OLS Full Model &mdash; R&sup2; = 0.25)</strong><br>
+    Utilization and ASP are the two strongest drivers of sales. Exam-only rate is not significant on its own when other variables are controlled for.
+    The critical finding is the <strong>offender &times; ASP interaction</strong> &mdash; for offender stores, higher ASP does not produce proportional revenue, meaning something structural is blocking the sale beyond pricing.
+    All coefficients are standardized, so beta values represent <em>relative importance</em>, not dollar-per-unit effects. Higher absolute beta = stronger influence on sales.<br><br>
+    <strong>Dependent variable:</strong> POS Sales (weekly average per site-quarter)<br><br>
+    <strong>Independent variables (9):</strong>
+    <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 13px;">
+        <thead>
+            <tr style="border-bottom: 2px solid #7C3AED;">
+                <th style="text-align: left; padding: 6px 10px; color: #1A365D;">Variable</th>
+                <th style="text-align: left; padding: 6px 10px; color: #1A365D;">Description</th>
+                <th style="text-align: right; padding: 6px 10px; color: #1A365D;">Beta</th>
+                <th style="text-align: left; padding: 6px 14px; color: #1A365D;">p-value</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr style="background: #EDE9FE;">
+                <td style="padding: 5px 10px; font-weight: 600;">utilization</td>
+                <td style="padding: 5px 10px;">Exam slot fill rate</td>
+                <td style="padding: 5px 10px; text-align: right; font-weight: 700; color: #27AE60;">+6,058</td>
+                <td style="padding: 5px 14px; color: #27AE60; font-weight: 600;">&lt; 0.001</td>
+            </tr>
+            <tr>
+                <td style="padding: 5px 10px; font-weight: 600;">asp</td>
+                <td style="padding: 5px 10px;">Avg sales price per transaction</td>
+                <td style="padding: 5px 10px; text-align: right; font-weight: 700; color: #27AE60;">+2,773</td>
+                <td style="padding: 5px 14px; color: #27AE60; font-weight: 600;">&lt; 0.001</td>
+            </tr>
+            <tr style="background: #EDE9FE;">
+                <td style="padding: 5px 10px; font-weight: 600;">epp_pct</td>
+                <td style="padding: 5px 10px;">Eyeglass protection plan attach rate</td>
+                <td style="padding: 5px 10px; text-align: right; font-weight: 700; color: #27AE60;">+1,035</td>
+                <td style="padding: 5px 14px; color: #27AE60; font-weight: 600;">&lt; 0.001</td>
+            </tr>
+            <tr>
+                <td style="padding: 5px 10px; font-weight: 600;">is_offender</td>
+                <td style="padding: 5px 10px;">Binary flag: 1 if persistent offender store</td>
+                <td style="padding: 5px 10px; text-align: right; font-weight: 700; color: #27AE60;">+3,222</td>
+                <td style="padding: 5px 14px; color: #27AE60; font-weight: 600;">0.004</td>
+            </tr>
+            <tr style="background: #EDE9FE;">
+                <td style="padding: 5px 10px; font-weight: 600;">eo_pct</td>
+                <td style="padding: 5px 10px;">Exam-only rate (% leaving without purchase)</td>
+                <td style="padding: 5px 10px; text-align: right; color: #8B95A5;">+43</td>
+                <td style="padding: 5px 14px; color: #8B95A5;">0.868 (not significant)</td>
+            </tr>
+            <tr>
+                <td style="padding: 5px 10px; font-weight: 600;">ri_pct</td>
+                <td style="padding: 5px 10px;">Refractive index upgrade rate</td>
+                <td style="padding: 5px 10px; text-align: right; font-weight: 700; color: #E74C3C;">-422</td>
+                <td style="padding: 5px 14px; color: #E67E22; font-weight: 600;">0.029</td>
+            </tr>
+            <tr style="background: #EDE9FE;">
+                <td style="padding: 5px 10px; font-weight: 600;">mas_pct</td>
+                <td style="padding: 5px 10px;">Multiple pair sales rate</td>
+                <td style="padding: 5px 10px; text-align: right; font-weight: 700; color: #E74C3C;">-825</td>
+                <td style="padding: 5px 14px; color: #27AE60; font-weight: 600;">&lt; 0.001</td>
+            </tr>
+            <tr>
+                <td style="padding: 5px 10px; font-weight: 600;">offender_x_eo</td>
+                <td style="padding: 5px 10px;">Interaction: is_offender &times; eo_pct</td>
+                <td style="padding: 5px 10px; text-align: right; color: #8B95A5;">-1,371</td>
+                <td style="padding: 5px 14px; color: #8B95A5;">0.083 (not significant)</td>
+            </tr>
+            <tr style="background: #FEE2E2;">
+                <td style="padding: 5px 10px; font-weight: 600;">offender_x_asp</td>
+                <td style="padding: 5px 10px;">Interaction: is_offender &times; asp</td>
+                <td style="padding: 5px 10px; text-align: right; font-weight: 700; color: #E74C3C;">-7,238</td>
+                <td style="padding: 5px 14px; color: #E74C3C; font-weight: 600;">&lt; 0.001</td>
+            </tr>
+        </tbody>
+    </table>
+    <br>
+    <em style="color: #667A8C;">Exam-only rate is a known conversion problem, but statistically its impact on sales is already reflected through ASP and utilization.
+    The key finding is the offender &times; ASP interaction &mdash; offender stores cannot convert pricing into revenue the way healthy stores do.</em>
+</div>
+""", unsafe_allow_html=True)
+
+# ═════════════════════════════════════════════
+# TAB 7: SEASONAL PATTERNS
+# ═════════════════════════════════════════════
+with tab7:
+    st.header("🌊 Seasonal Patterns")
+    st.markdown("<p style='color: #667A8C; font-size: 13px; margin-bottom: 1.5rem;'>Quarterly seasonal profiles and structural trend analysis across KPIs and regions.</p>", unsafe_allow_html=True)
+
+    # ── Section 1: Seasonal Patterns by KPI ──
+    st.subheader("Seasonal Patterns by KPI")
+
+    # KPI selector
+    kpi_labels = seasonality['kpi_label'].unique().tolist()
+    selected_kpi_label = st.selectbox("Select KPI", kpi_labels, index=0, key="season_kpi")
+
+    season_kpi_data = seasonality[seasonality['kpi_label'] == selected_kpi_label]
+
+    # Group selector for seasonality
+    season_groups = season_kpi_data['group'].unique().tolist()
+    selected_season_groups = st.multiselect(
+        "Select groups",
+        options=season_groups,
+        default=season_groups[:3] if len(season_groups) >= 3 else season_groups,
+        key="season_groups"
+    )
+
+    if selected_season_groups:
+        season_colors = ['#1E7BC0', '#27AE60', '#E74C3C', '#9B59B6', '#E67E22', '#1ABC9C']
+        fig_season = go.Figure()
+
+        for idx, group_name in enumerate(selected_season_groups):
+            row = season_kpi_data[season_kpi_data['group'] == group_name]
+            if not row.empty:
+                row = row.iloc[0]
+                quarters = ['Q1', 'Q2', 'Q3', 'Q4']
+                values = [row['Q1_median'], row['Q2_median'], row['Q3_median'], row['Q4_median']]
+                color = season_colors[idx % len(season_colors)]
+
+                fig_season.add_trace(go.Scatter(
+                    x=quarters, y=values,
+                    mode='lines+markers',
+                    name=group_name,
+                    line=dict(color=color, width=2.5),
+                    marker=dict(size=8, color=color)
+                ))
+
+        # Format y-axis based on KPI type
+        is_pct = '%' in selected_kpi_label or 'pct' in selected_kpi_label.lower()
+        is_dollar = '$' in selected_kpi_label
+
+        yaxis_fmt = dict()
+        if is_pct:
+            yaxis_fmt = dict(yaxis_tickformat=".1%")
+        elif is_dollar:
+            yaxis_fmt = dict(yaxis_tickprefix="$", yaxis_tickformat=",.0f")
+
+        fig_season.update_layout(
+            title=None,
+            xaxis_title="Quarter",
+            yaxis_title=selected_kpi_label,
+            template="plotly_white",
+            height=400,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            hovermode="x unified",
+            margin=dict(l=60, r=30, t=40, b=60),
+            **yaxis_fmt
+        )
+        st.plotly_chart(fig_season, use_container_width=True)
+
+        # Seasonality strength table
+        st.markdown("**Seasonality Test Results** (Kruskal-Wallis H-Test)")
+        season_table = season_kpi_data[season_kpi_data['group'].isin(selected_season_groups)][
+            ['group', 'H_statistic', 'p_value', 'significant_at_05']
+        ].rename(columns={
+            'group': 'Group',
+            'H_statistic': 'H-Statistic',
+            'p_value': 'p-value',
+            'significant_at_05': 'Significant (α=0.05)'
+        })
+        st.dataframe(season_table, use_container_width=True, hide_index=True)
+    else:
+        st.info("Select at least one group to display seasonal patterns.")
+
+    st.divider()
+
+    # ── Section 2: Structural Trend Analysis (Slope Chart) ──
+    st.subheader("Structural Trend Analysis")
+    st.markdown("<p style='color: #667A8C; font-size: 13px;'>Rolling 13-week regression slopes showing trend direction and strength over time.</p>", unsafe_allow_html=True)
+
+    # KPI selector for structural breaks
+    sb_kpis_tab7 = structural_breaks['kpi_label'].unique().tolist()
+    selected_sb_kpi_tab7 = st.selectbox("Select KPI", sb_kpis_tab7, index=0, key="sb_kpi_tab7")
+
+    sb_data_tab7 = structural_breaks[structural_breaks['kpi_label'] == selected_sb_kpi_tab7].sort_values('date')
+
+    if not sb_data_tab7.empty:
+        # Slope trend chart
+        fig_slope = go.Figure()
+
+        pos_slopes = sb_data_tab7[sb_data_tab7['slope'] >= 0]
+        neg_slopes = sb_data_tab7[sb_data_tab7['slope'] < 0]
+
+        fig_slope.add_trace(go.Bar(
+            x=pos_slopes['date'], y=pos_slopes['slope'],
+            name='Positive Trend',
+            marker_color='#27AE60',
+            opacity=0.7
+        ))
+        fig_slope.add_trace(go.Bar(
+            x=neg_slopes['date'], y=neg_slopes['slope'],
+            name='Negative Trend',
+            marker_color='#E74C3C',
+            opacity=0.7
+        ))
+
+        fig_slope.update_layout(
+            title=None,
+            xaxis_title="Week",
+            yaxis_title="Trend Slope (Weekly Change)",
+            template="plotly_white",
+            height=400,
+            barmode='relative',
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            hovermode="x unified",
+            margin=dict(l=60, r=30, t=40, b=60)
+        )
+        st.plotly_chart(fig_slope, use_container_width=True)
+
+        # Summary stats for structural trends
+        recent_slopes_tab7 = sb_data_tab7.tail(4)
+        avg_slope_tab7 = recent_slopes_tab7['slope'].mean()
+        avg_r2_tab7 = recent_slopes_tab7['r_squared'].mean()
+        trend_dir_tab7 = "Upward" if avg_slope_tab7 > 0 else "Downward"
+
+        tcol1, tcol2, tcol3 = st.columns(3)
+        with tcol1:
+            st.metric("Recent Trend (4-wk avg)", trend_dir_tab7, f"{avg_slope_tab7:+.2f}/week")
+        with tcol2:
+            st.metric("Model Confidence (R²)", f"{avg_r2_tab7:.3f}")
+        with tcol3:
+            sig_wks = len(sb_data_tab7[sb_data_tab7['p_value'] < 0.05])
+            st.metric("Significant Weeks", f"{sig_wks}/{len(sb_data_tab7)}", f"{sig_wks/len(sb_data_tab7)*100:.0f}%")
 
 # ─────────────────────────────────────────────
 # FOOTER
