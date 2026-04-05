@@ -1757,9 +1757,11 @@ st.markdown(
     """
     ---
     **Northstar Analytics — MyEyeDr Anomaly Detection Dashboard**
-    
+
+    Authors: **Ali Asgar Attar** & **Bryan Barber**
+
     Data as of: """ + latest_date.strftime("%B %d, %Y") + """
-    
+
     Z-Score Threshold: 2.0σ | Anomaly Score: 0-10 scale (weighted) | Direction-aware scoring separates negative & positive performers
     """
 )
