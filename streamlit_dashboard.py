@@ -501,12 +501,13 @@ with tab1:
     st.markdown(f"<p style='color: #667A8C; font-size: 13px; margin-bottom: 1.5rem;'>Report Period: <strong>{latest_date.strftime('%B %d, %Y')}</strong></p>", unsafe_allow_html=True)
     
     # Key metrics - Single row with Total Sites + Alert boxes (consistent sizing)
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     total_sites = len(filtered_data)
     critical_count = len(filtered_data[filtered_data['alert_tier'] == 'Alert'])
     watch_count = len(filtered_data[filtered_data['alert_tier'] == 'Watch'])
     noise_clean = len(filtered_data[filtered_data['alert_tier'].isin(['Noise', 'Clean'])])
+    pos_outlier_count = len(filtered_data[filtered_data.get('positive_tier', pd.Series(dtype=str)) == 'Positive Outlier']) if 'positive_tier' in filtered_data.columns else 0
 
     with col1:
         st.markdown(f"<div style='text-align: center; padding: 1.5rem; background: linear-gradient(135deg, #E8F0F8 0%, #F0F4F8 100%); border-radius: 12px; border: 1px solid #D0E0F0; border-left: 5px solid #1E90FF;'><p style='font-size: 14px; color: #666; margin: 0 0 0.5rem 0;'>Total Sites Scored</p><p style='font-size: 26px; font-weight: bold; color: #1E90FF; margin: 0;'>{total_sites}</p></div>", unsafe_allow_html=True)
@@ -524,8 +525,12 @@ with tab1:
         st.markdown(f"<div style='background: linear-gradient(135deg, #E8FFE8 0%, #D6FFD6 100%); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 15px rgba(50, 205, 50, 0.2); border-left: 5px solid #32CD32; text-align: center;'><div style='font-size: 24px; font-weight: bold;'>🟢</div><div style='font-weight: bold; font-size: 13px; color: #0B1F3F; margin-top: 0.3rem;'>Clean/Noise</div><div style='font-size: 26px; color: #32CD32; font-weight: bold; margin-top: 0.5rem;'>{noise_clean}</div><div style='font-size: 11px; color: #666; margin-top: 0.2rem;'>{noise_clean/total_sites*100:.1f}% of total</div></div>", unsafe_allow_html=True)
         st.markdown("<p style='text-align: center; font-weight: bold; margin: 0.8rem 0 0 0; color: #0B1F3F;'>Score 0-1<br><span style='font-size: 12px; font-weight: normal;'>Normal variation</span></p>", unsafe_allow_html=True)
 
+    with col5:
+        st.markdown(f"<div style='background: linear-gradient(135deg, #E8F0FF 0%, #D6E4FF 100%); border-radius: 12px; padding: 1.5rem; box-shadow: 0 4px 15px rgba(30, 123, 192, 0.2); border-left: 5px solid #1E7BC0; text-align: center;'><div style='font-size: 24px; font-weight: bold;'>⭐</div><div style='font-weight: bold; font-size: 13px; color: #0B1F3F; margin-top: 0.3rem;'>Positive Outlier</div><div style='font-size: 26px; color: #1E7BC0; font-weight: bold; margin-top: 0.5rem;'>{pos_outlier_count}</div><div style='font-size: 11px; color: #666; margin-top: 0.2rem;'>{pos_outlier_count/total_sites*100:.1f}% of total</div></div>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align: center; font-weight: bold; margin: 0.8rem 0 0 0; color: #0B1F3F;'>Weighted Pos &ge; 3.0<br><span style='font-size: 12px; font-weight: normal;'>Best-practice candidates</span></p>", unsafe_allow_html=True)
+
     st.divider()
-    
+
     # ── Alert Performance Context: Positive vs Negative Breakdown ──
     st.subheader("Alert Performance Context: What's Driving the Alerts?")
     st.markdown("""
@@ -539,7 +544,7 @@ with tab1:
     # Classify: a critical alert is "negative-performing" if its negative score dominates,
     # "positive-performing" if its positive score dominates
     neg_critical = critical_sites[critical_sites['weighted_negative_score'] > critical_sites['weighted_positive_score']]
-    pos_critical = critical_sites[critical_sites['weighted_positive_score'] >= critical_sites['weighted_negative_score']]
+    pos_critical = critical_sites[critical_sites['weighted_positive_score'] > critical_sites['weighted_negative_score']]
 
     neg_count = len(neg_critical)
     pos_count = len(pos_critical)
@@ -829,7 +834,7 @@ with tab2:
     
     # Calculate positive vs negative breakdown
     neg_alerts = critical_filtered[critical_filtered['weighted_negative_score'] > critical_filtered['weighted_positive_score']]
-    pos_alerts = critical_filtered[critical_filtered['weighted_positive_score'] >= critical_filtered['weighted_negative_score']]
+    pos_alerts = critical_filtered[critical_filtered['weighted_positive_score'] > critical_filtered['weighted_negative_score']]
     
     neg_alert_count = len(neg_alerts)
     pos_alert_count = len(pos_alerts)
@@ -867,10 +872,11 @@ with tab2:
                                      marker=dict(color='#FF6B6B'))])
         fig.update_layout(title="", xaxis_title="Count", yaxis_title="", height=400, showlegend=False,
                          plot_bgcolor='#FAFAFA', paper_bgcolor='white',
+                         margin=dict(l=180, r=20, t=30, b=40),
                          xaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'),
-                         yaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'))
+                         yaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0', automargin=True))
         st.plotly_chart(fig, use_container_width=True)
-    
+
     with col_region:
         st.subheader("Alerts by Region")
         region_dist = critical_filtered['Region'].value_counts().sort_values(ascending=True)
@@ -881,8 +887,9 @@ with tab2:
                                      marker=dict(color='#1E7BC0'))])
         fig.update_layout(title="", xaxis_title="Count", yaxis_title="", height=400, showlegend=False,
                          plot_bgcolor='#FAFAFA', paper_bgcolor='white',
+                         margin=dict(l=120, r=20, t=30, b=40),
                          xaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'),
-                         yaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'))
+                         yaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0', automargin=True))
         st.plotly_chart(fig, use_container_width=True)
     
     st.divider()
@@ -900,8 +907,8 @@ with tab2:
         neg_display_df['utilization'] = neg_display_df['utilization'].apply(lambda x: f"{x:.1%}")
         neg_display_df['asp'] = neg_display_df['asp'].apply(lambda x: f"${x:.0f}")
         rename_map = {
-            'site_id': 'Site ID', 'site_name': 'Site Name', 'anomaly_score': 'Score',
-            'weighted_negative_score': 'Neg Score', 'weighted_positive_score': 'Pos Score',
+            'site_id': 'Site ID', 'site_name': 'Site Name', 'anomaly_score': 'Unweighted Score',
+            'weighted_negative_score': 'Weighted Neg', 'weighted_positive_score': 'Weighted Pos',
             'anomaly_type': 'Type', 'primary_driver': 'Driver', 'positive_tier': 'Outlier',
             'pos_sales': 'POS Sales', 'utilization': 'Util %', 'asp': 'ASP'
         }
@@ -920,8 +927,8 @@ with tab2:
         pos_display_df['utilization'] = pos_display_df['utilization'].apply(lambda x: f"{x:.1%}")
         pos_display_df['asp'] = pos_display_df['asp'].apply(lambda x: f"${x:.0f}")
         rename_map = {
-            'site_id': 'Site ID', 'site_name': 'Site Name', 'anomaly_score': 'Score',
-            'weighted_negative_score': 'Neg Score', 'weighted_positive_score': 'Pos Score',
+            'site_id': 'Site ID', 'site_name': 'Site Name', 'anomaly_score': 'Unweighted Score',
+            'weighted_negative_score': 'Weighted Neg', 'weighted_positive_score': 'Weighted Pos',
             'anomaly_type': 'Type', 'primary_driver': 'Driver', 'positive_tier': 'Outlier',
             'pos_sales': 'POS Sales', 'utilization': 'Util %', 'asp': 'ASP'
         }
@@ -972,10 +979,11 @@ with tab3:
                                      marker=dict(color='#FFC107'))])
         fig.update_layout(title="", xaxis_title="Count", yaxis_title="", height=400, showlegend=False,
                          plot_bgcolor='#FAFAFA', paper_bgcolor='white',
+                         margin=dict(l=120, r=20, t=30, b=40),
                          xaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'),
-                         yaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'))
+                         yaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0', automargin=True))
         st.plotly_chart(fig, use_container_width=True)
-    
+
     with col_driver:
         st.subheader("Primary Drivers on Watch")
         drivers = watch_filtered['primary_driver'].value_counts().head(8).sort_values(ascending=True)
@@ -986,8 +994,9 @@ with tab3:
                                      marker=dict(color='#FFC107'))])
         fig.update_layout(title="", xaxis_title="Count", yaxis_title="", height=400, showlegend=False,
                          plot_bgcolor='#FAFAFA', paper_bgcolor='white',
+                         margin=dict(l=180, r=20, t=30, b=40),
                          xaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'),
-                         yaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'))
+                         yaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0', automargin=True))
         st.plotly_chart(fig, use_container_width=True)
     
     st.divider()
@@ -1003,8 +1012,8 @@ with tab3:
     display_df['utilization'] = display_df['utilization'].apply(lambda x: f"{x:.1%}")
     display_df['asp'] = display_df['asp'].apply(lambda x: f"${x:.0f}")
     rename_map = {
-        'site_id': 'Site ID', 'site_name': 'Site Name', 'anomaly_score': 'Score',
-        'weighted_negative_score': 'Neg Score', 'weighted_positive_score': 'Pos Score',
+        'site_id': 'Site ID', 'site_name': 'Site Name', 'anomaly_score': 'Unweighted Score',
+        'weighted_negative_score': 'Weighted Neg', 'weighted_positive_score': 'Weighted Pos',
         'anomaly_type': 'Type', 'primary_driver': 'Driver',
         'pos_sales': 'POS Sales', 'utilization': 'Util %', 'asp': 'ASP'
     }
@@ -1026,7 +1035,7 @@ with tab4:
         'utilization': 'mean',
         'asp': 'mean'
     }).round(2)
-    regional_summary.columns = ['Sites', 'Avg Score', 'Avg POS Sales', 'Avg Utilization', 'Avg ASP']
+    regional_summary.columns = ['Sites', 'Avg Unweighted Score', 'Avg POS Sales', 'Avg Utilization', 'Avg ASP']
     
     st.subheader("Regional Performance Summary")
     st.dataframe(regional_summary, use_container_width=True)
@@ -1046,7 +1055,7 @@ with tab4:
     # Classify: a critical alert is "negative-performing" if its negative score dominates,
     # "positive-performing" if its positive score dominates
     neg_critical = critical_sites[critical_sites['weighted_negative_score'] > critical_sites['weighted_positive_score']]
-    pos_critical = critical_sites[critical_sites['weighted_positive_score'] >= critical_sites['weighted_negative_score']]
+    pos_critical = critical_sites[critical_sites['weighted_positive_score'] > critical_sites['weighted_negative_score']]
 
     neg_count = len(neg_critical)
     pos_count = len(pos_critical)
@@ -1104,12 +1113,12 @@ with tab4:
             paper_bgcolor='white',
             showlegend=True,
             legend=dict(orientation='v', yanchor='top', y=1, xanchor='left', x=1.02),
-            xaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'),
+            xaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0', tickangle=-30, automargin=True),
             yaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'),
-            margin=dict(r=100)
+            margin=dict(l=50, r=100, t=30, b=80)
         )
         st.plotly_chart(fig_tier, use_container_width=True)
-    
+
     with col_perf:
         st.subheader("Negative vs Positive by Region")
         if len(critical_sites) > 0:
@@ -1127,17 +1136,17 @@ with tab4:
                        textfont=dict(size=10, color='black', family='Arial Black'))
             ])
             fig_perf.update_layout(
-                barmode='group', 
+                barmode='group',
                 height=450,
-                xaxis_title="Region", 
+                xaxis_title="Region",
                 yaxis_title="Count",
-                plot_bgcolor='#FAFAFA', 
+                plot_bgcolor='#FAFAFA',
                 paper_bgcolor='white',
                 showlegend=True,
                 legend=dict(orientation='v', yanchor='top', y=1, xanchor='left', x=1.02),
-                xaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'),
+                xaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0', tickangle=-30, automargin=True),
                 yaxis=dict(showline=True, linewidth=1, linecolor='#D0D0D0'),
-                margin=dict(r=100)
+                margin=dict(l=50, r=100, t=30, b=80)
             )
             st.plotly_chart(fig_perf, use_container_width=True)
         else:
@@ -1364,7 +1373,7 @@ with tab6:
             )
 
         fig_proj.update_layout(
-            title=None,
+            title="5-Year Sales Projections by Cohort",
             xaxis_title="Quarter",
             yaxis_title="Avg Weekly POS Sales ($)",
             yaxis_tickprefix="$", yaxis_tickformat=",.0f",
@@ -1427,7 +1436,7 @@ with tab6:
                          annotation_font_size=11)
 
         fig_r2.update_layout(
-            title=None,
+            title="Rolling 13-Week Model Fit Confidence (R²)",
             xaxis_title="Week",
             yaxis_title="R-Squared",
             yaxis_range=[0, 1],
@@ -1608,7 +1617,7 @@ with tab7:
             yaxis_fmt = dict(yaxis_tickprefix="$", yaxis_tickformat=",.0f")
 
         fig_season.update_layout(
-            title=None,
+            title=f"Quarterly Seasonal Profile — {selected_kpi_label}",
             xaxis_title="Quarter",
             yaxis_title=selected_kpi_label,
             template="plotly_white",
@@ -1667,7 +1676,7 @@ with tab7:
         ))
 
         fig_slope.update_layout(
-            title=None,
+            title=f"Rolling Trend Slopes — {selected_sb_kpi_tab7}",
             xaxis_title="Week",
             yaxis_title="Trend Slope (Weekly Change)",
             template="plotly_white",
