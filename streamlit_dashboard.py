@@ -543,7 +543,7 @@ with tab1:
 
     # Classify: a critical alert is "negative-performing" if its negative score dominates,
     # "positive-performing" if its positive score dominates
-    neg_critical = critical_sites[critical_sites['weighted_negative_score'] > critical_sites['weighted_positive_score']]
+    neg_critical = critical_sites[critical_sites['weighted_negative_score'] >= critical_sites['weighted_positive_score']]
     pos_critical = critical_sites[critical_sites['weighted_positive_score'] > critical_sites['weighted_negative_score']]
 
     neg_count = len(neg_critical)
@@ -833,7 +833,7 @@ with tab2:
     """)
     
     # Calculate positive vs negative breakdown
-    neg_alerts = critical_filtered[critical_filtered['weighted_negative_score'] > critical_filtered['weighted_positive_score']]
+    neg_alerts = critical_filtered[critical_filtered['weighted_negative_score'] >= critical_filtered['weighted_positive_score']]
     pos_alerts = critical_filtered[critical_filtered['weighted_positive_score'] > critical_filtered['weighted_negative_score']]
     
     neg_alert_count = len(neg_alerts)
@@ -938,12 +938,58 @@ with tab2:
         st.info("No positive-performing alert sites at this time.")
     
     st.divider()
+
+    # ── Positive Outliers Section ──
+    st.subheader("⭐ Positive Outliers (Best-Practice Candidates)")
+    st.markdown("""
+    <p style='font-size: 13px; color: #1E7BC0;'><strong>Positive Outlier:</strong> Sites with Weighted Positive Score &ge; 3.0 —
+    <strong>Significantly outperforming their baseline across multiple KPIs.</strong> These may represent best-practice candidates,
+    seasonal spikes, or data quality anomalies worth investigating.</p>
+    """, unsafe_allow_html=True)
+
+    pos_outlier_sites = filtered_data[filtered_data.get('positive_tier', pd.Series(dtype=str)) == 'Positive Outlier'] if 'positive_tier' in filtered_data.columns else pd.DataFrame()
+
+    if len(pos_outlier_sites) > 0:
+        pos_outlier_display_cols = ['site_id', 'site_name', 'Region', 'Quad', 'anomaly_score',
+                                    'weighted_negative_score', 'weighted_positive_score',
+                                    'anomaly_type', 'primary_driver', 'alert_tier',
+                                    'pos_sales', 'utilization', 'asp', 'eo_pct', 'epp_pct',
+                                    'ri_pct', 'mas_pct', 'appts_created', 'patient_fallout', 'comp_exam_pct']
+
+        pos_outlier_df = pos_outlier_sites[[c for c in pos_outlier_display_cols if c in pos_outlier_sites.columns]].copy()
+        pos_outlier_df = pos_outlier_df.sort_values('weighted_positive_score', ascending=False)
+        pos_outlier_df['utilization'] = pos_outlier_df['utilization'].apply(lambda x: f"{x:.1%}")
+        pos_outlier_df['asp'] = pos_outlier_df['asp'].apply(lambda x: f"${x:.0f}")
+        pos_outlier_df['eo_pct'] = pos_outlier_df['eo_pct'].apply(lambda x: f"{x:.1%}") if 'eo_pct' in pos_outlier_df.columns else pos_outlier_df.get('eo_pct')
+        pos_outlier_df['epp_pct'] = pos_outlier_df['epp_pct'].apply(lambda x: f"{x:.1%}") if 'epp_pct' in pos_outlier_df.columns else pos_outlier_df.get('epp_pct')
+        pos_outlier_df['ri_pct'] = pos_outlier_df['ri_pct'].apply(lambda x: f"{x:.1%}") if 'ri_pct' in pos_outlier_df.columns else pos_outlier_df.get('ri_pct')
+        pos_outlier_df['mas_pct'] = pos_outlier_df['mas_pct'].apply(lambda x: f"{x:.1%}") if 'mas_pct' in pos_outlier_df.columns else pos_outlier_df.get('mas_pct')
+        pos_outlier_df['comp_exam_pct'] = pos_outlier_df['comp_exam_pct'].apply(lambda x: f"{x:.1%}") if 'comp_exam_pct' in pos_outlier_df.columns else pos_outlier_df.get('comp_exam_pct')
+        pos_outlier_df['patient_fallout'] = pos_outlier_df['patient_fallout'].apply(lambda x: f"{x:.0f}") if 'patient_fallout' in pos_outlier_df.columns else pos_outlier_df.get('patient_fallout')
+        pos_outlier_df['appts_created'] = pos_outlier_df['appts_created'].apply(lambda x: f"{x:.0f}") if 'appts_created' in pos_outlier_df.columns else pos_outlier_df.get('appts_created')
+
+        pos_outlier_rename = {
+            'site_id': 'Site ID', 'site_name': 'Site Name', 'anomaly_score': 'Unweighted Score',
+            'weighted_negative_score': 'Weighted Neg', 'weighted_positive_score': 'Weighted Pos',
+            'anomaly_type': 'Type', 'primary_driver': 'Driver', 'alert_tier': 'Alert Tier',
+            'pos_sales': 'POS Sales', 'utilization': 'Util %', 'asp': 'ASP',
+            'eo_pct': 'EO %', 'epp_pct': 'EPP %', 'ri_pct': 'RI %', 'mas_pct': 'MAS %',
+            'appts_created': 'Appts Created', 'patient_fallout': 'Pt Fallout', 'comp_exam_pct': 'Comp Exam %'
+        }
+        pos_outlier_df = pos_outlier_df.rename(columns={k: v for k, v in pos_outlier_rename.items() if k in pos_outlier_df.columns})
+
+        st.markdown(f"**{len(pos_outlier_sites)} sites** classified as Positive Outliers (Weighted Positive Score ≥ 3.0)")
+        st.dataframe(pos_outlier_df, use_container_width=True, height=500)
+    else:
+        st.info("No positive outlier sites identified with current filters.")
+
+    st.divider()
     st.subheader("Alerts: Medicaid vs Non-Medicaid")
     col_med1, col_med2, col_med3 = st.columns(3)
-    
+
     medicaid_critical = len(critical_filtered[critical_filtered['is_medicaid'] == 1.0])
     non_medicaid_critical = len(critical_filtered[critical_filtered['is_medicaid'] == 0.0])
-    
+
     with col_med1:
         st.metric("Medicaid Alert", medicaid_critical)
     with col_med2:
@@ -1054,7 +1100,7 @@ with tab4:
 
     # Classify: a critical alert is "negative-performing" if its negative score dominates,
     # "positive-performing" if its positive score dominates
-    neg_critical = critical_sites[critical_sites['weighted_negative_score'] > critical_sites['weighted_positive_score']]
+    neg_critical = critical_sites[critical_sites['weighted_negative_score'] >= critical_sites['weighted_positive_score']]
     pos_critical = critical_sites[critical_sites['weighted_positive_score'] > critical_sites['weighted_negative_score']]
 
     neg_count = len(neg_critical)
