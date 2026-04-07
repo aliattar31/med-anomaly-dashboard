@@ -1138,14 +1138,17 @@ with tab4:
     with col_tier:
         st.subheader("Alert Tier by Region")
         region_tier = pd.crosstab(filtered_data['Region'], filtered_data['alert_tier'])
+        # Ensure columns exist as Series (not scalar 0) so Plotly can handle single-store filters
+        alert_vals = region_tier['Alert'] if 'Alert' in region_tier.columns else pd.Series(0, index=region_tier.index)
+        watch_vals = region_tier['Watch'] if 'Watch' in region_tier.columns else pd.Series(0, index=region_tier.index)
         fig_tier = go.Figure(data=[
-            go.Bar(name='Alert', x=region_tier.index, y=region_tier.get('Alert', 0), 
-                   text=region_tier.get('Alert', 0),
+            go.Bar(name='Alert', x=region_tier.index, y=alert_vals,
+                   text=alert_vals,
                    textposition='inside',
                    textfont=dict(size=10, color='black', family='Arial Black'),
                    marker=dict(color='#FF6B6B')),
-            go.Bar(name='Watch', x=region_tier.index, y=region_tier.get('Watch', 0), 
-                   text=region_tier.get('Watch', 0),
+            go.Bar(name='Watch', x=region_tier.index, y=watch_vals,
+                   text=watch_vals,
                    textposition='inside',
                    textfont=dict(size=10, color='black', family='Arial Black'),
                    marker=dict(color='#FFC107')),
