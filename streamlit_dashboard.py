@@ -10,7 +10,11 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 import warnings
+import os
 warnings.filterwarnings('ignore')
+
+# Path to assets
+ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG
@@ -105,7 +109,7 @@ st.markdown("""
         flex-direction: column;
         gap: 0.15rem;
     }
-    
+
     .header-title {
         color: #1A365D;
         font-weight: 800;
@@ -114,7 +118,7 @@ st.markdown("""
         margin: 0;
         text-transform: uppercase;
     }
-    
+
     .header-subtitle {
         color: #667A8C;
         font-size: 12px;
@@ -122,7 +126,7 @@ st.markdown("""
         font-weight: 500;
         letter-spacing: 0.5px;
     }
-    
+
     .header-right {
         color: #8B95A5;
         font-size: 12px;
@@ -476,6 +480,27 @@ if medicaid_options:
 
 if tele_opt:
     filtered_data = filtered_data[filtered_data['is_tele_opt'] == 1.0]
+
+# ─────────────────────────────────────────────
+# LOGO BAR
+# ─────────────────────────────────────────────
+import base64
+
+def get_svg_base64(filepath):
+    with open(filepath, "r") as f:
+        svg_content = f.read()
+    return base64.b64encode(svg_content.encode()).decode()
+
+smu_b64 = get_svg_base64(os.path.join(ASSETS_DIR, "smu_logo_new.svg"))
+med_b64 = get_svg_base64(os.path.join(ASSETS_DIR, "myeyedr_logo1.svg"))
+
+st.markdown(f"""
+<div style="display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:0.5rem;">
+    <img src="data:image/svg+xml;base64,{smu_b64}" height="35" />
+    <span style="font-size:18px; font-weight:bold; color:#1A365D;">✕</span>
+    <img src="data:image/svg+xml;base64,{med_b64}" height="28" />
+</div>
+""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────────
 # NAVIGATION TABS

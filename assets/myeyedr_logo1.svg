@@ -1,0 +1,6 @@
+<svg viewBox="0 0 200 50" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+  <!-- MyEyeDr. Logo -->
+  <text x="10" y="38" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="bold" letter-spacing="-0.5">
+    <tspan fill="#0e1e3f">myeye</tspan><tspan fill="#5bbce4">Dr.</tspan>
+  </text>
+</svg>
